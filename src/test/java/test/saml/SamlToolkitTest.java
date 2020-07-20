@@ -29,6 +29,7 @@ public class SamlToolkitTest {
         Assert.assertEquals(saml, redirectSAML);
     }
 
+
     @Test
     public void test_encode_SAML_redirect() throws Exception {
         String data = SamlToolkit.encodeSAML_redirect(redirectSAML);
@@ -40,4 +41,11 @@ public class SamlToolkitTest {
         String data = SamlToolkit.encodeSAML_post(postSAML);
         Assert.assertEquals(data,postSAML_Payload);
     }
+
+    @Test
+    public void test_encode_signed_SAML_post() throws Exception {
+        String data = SamlToolkit.encodeSAML_post(postSAML);
+        Assert.assertEquals(data,postSAML_Payload);
+    }
+
 }
