@@ -1,5 +1,6 @@
 package test.saml2;
 
+import org.apache.commons.httpclient.auth.AuthState;
 import org.apache.commons.lang.RandomStringUtils;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.openssl.PEMParser;
@@ -10,11 +11,13 @@ import org.opensaml.common.SAMLObjectBuilder;
 import org.opensaml.saml2.core.*;
 import org.opensaml.saml2.core.impl.*;
 import org.opensaml.saml2.metadata.EntitiesDescriptor;
+import org.opensaml.xacml.ctx.impl.AttributeValueTypeImplBuilder;
 import org.opensaml.xml.XMLObjectBuilderFactory;
 import org.opensaml.xml.io.MarshallerFactory;
 import org.opensaml.xml.io.Unmarshaller;
 import org.opensaml.xml.io.UnmarshallerFactory;
 import org.opensaml.xml.parse.BasicParserPool;
+import org.opensaml.xml.schema.XSString;
 import org.opensaml.xml.security.SecurityConfiguration;
 import org.opensaml.xml.security.SecurityHelper;
 import org.opensaml.xml.security.credential.Credential;
@@ -81,11 +84,13 @@ public class SamlToolkit {
         return basicCredential;
     }
 
-    public static void createSamlResponse() throws Exception {
+    public static void createSamlResponse(String tenantId,String metadataUri) throws Exception {
         org.opensaml.DefaultBootstrap.bootstrap();
         XMLObjectBuilderFactory builderFactory = Configuration.getBuilderFactory();
         SAMLObjectBuilder<Response> responseBuilder = (SAMLObjectBuilder<Response>) builderFactory.getBuilder(Response.DEFAULT_ELEMENT_NAME);
+        String inResponseTo = UUID.randomUUID().toString();
         Response response = responseBuilder.buildObject();
+        response.setInResponseTo(inResponseTo);
 
         StatusCode statusCode = new StatusCodeBuilder().buildObject();
         statusCode.setValue("urn:oasis:names:tc:SAML:2.0:status:Success");
@@ -93,9 +98,10 @@ public class SamlToolkit {
         status.setStatusCode(statusCode);
         response.setStatus(status);
 
+        String assertionRef = UUID.randomUUID().toString();
         SAMLObjectBuilder<Assertion> assertionsBuilder = (SAMLObjectBuilder<Assertion>) builderFactory.getBuilder(Assertion.DEFAULT_ELEMENT_NAME);
         Assertion ass = assertionsBuilder.buildObject();
-        ass.setID(UUID.randomUUID().toString());
+        ass.setID(assertionRef);
         ass.setIssueInstant(new DateTime());
 
         Issuer issuer = new IssuerBuilder().buildObject();
@@ -104,12 +110,65 @@ public class SamlToolkit {
 
         Subject subject = new SubjectBuilder().buildObject(Subject.DEFAULT_ELEMENT_NAME);
         NameID nameId = new NameIDBuilder().buildObject();
+        SubjectConfirmationData subConfirmData = new SubjectConfirmationDataBuilder().buildObject();
+        subConfirmData.setInResponseTo(inResponseTo);
+        subConfirmData.setNotOnOrAfter(new DateTime().plusHours(1));
+        subConfirmData.setRecipient("https://sso-dev.pageroonline.com/authn/authentication/creative_ad_saml_authenticator");
+
         SubjectConfirmation subConfirm = new SubjectConfirmationBuilder().buildObject();
+        subConfirm.setMethod("urn:oasis:names:tc:SAML:2.0:cm:bearer");
+        subConfirm.setSubjectConfirmationData(subConfirmData);
+
         nameId.setValue(RandomStringUtils.randomAlphabetic(44));
         subject.setNameID(nameId);
 
         ass.setSubject(subject);
 
+        Conditions condition = new ConditionsBuilder().buildObject();
+        DateTime now = new DateTime();
+        condition.setNotBefore(now.minusHours(1));
+        condition.setNotOnOrAfter(now.plusHours(1));
+        ass.setConditions(condition);
+
+        AttributeStatement as = new AttributeStatementBuilder().buildObject();
+
+        as.getAttributes().add(
+                createAttribute("http://schemas.microsoft.com/identity/claims/tenantid", tenantId));
+        as.getAttributes().add(
+                createAttribute("http://schemas.microsoft.com/identity/claims/objectidentifier",UUID.randomUUID().toString())
+        );
+        as.getAttributes().add(
+                createAttribute("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name", "Sajith.S@CreativeSoftware.com")
+        );
+        as.getAttributes().add(
+                createAttribute("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname","Silva")
+        );
+        as.getAttributes().add(
+                createAttribute("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname","Sajith")
+        );
+        as.getAttributes().add(
+                createAttribute("http://schemas.microsoft.com/identity/claims/displayname","Sajith Silva")
+        );
+        as.getAttributes().add(
+                createAttribute("http://schemas.microsoft.com/identity/claims/identityprovider",metadataUri)
+        );
+        as.getAttributes().add(
+                createAttribute("http://schemas.microsoft.com/claims/authnmethodsreferences","http://schemas.microsoft.com/ws/2008/06/identity/authenticationmethod/password")
+        );
+
+        ass.getAttributeStatements().add(as);
+
+        AuthnContextClassRef classRef = new AuthnContextClassRefBuilder().buildObject();
+        classRef.setAuthnContextClassRef("urn:oasis:names:tc:SAML:2.0:ac:classes:Password");
+        AuthnContext ctx = new AuthnContextBuilder().buildObject();
+        ctx.setAuthnContextClassRef(classRef);
+
+        AuthnStatement authnStatement = new  AuthnStatementBuilder().buildObject();
+        authnStatement.setAuthnInstant(now);
+        authnStatement.setSessionIndex(assertionRef);
+        authnStatement.setAuthnContext(ctx);
+
+        ass.getAuthnStatements().add(authnStatement);
         Element subjectElement = sign(response, ass);
 
         TransformerFactory transformerFactory = TransformerFactory.newInstance();
@@ -117,6 +176,16 @@ public class SamlToolkit {
         DOMSource source = new DOMSource(subjectElement);
         StreamResult result = new StreamResult(new FileWriter("test.saml.xml"));
         transformer.transform(source, result);
+    }
+
+    private static Attribute createAttribute(String name, String value) {
+        XSString att1val1 = (XSString) Configuration.getBuilderFactory().getBuilder(XSString.TYPE_NAME).buildObject(
+                AttributeValue.DEFAULT_ELEMENT_NAME, XSString.TYPE_NAME);
+        att1val1.setValue(value);
+        Attribute attribute1 = new AttributeBuilder().buildObject();
+        attribute1.setName(name);
+        attribute1.getAttributeValues().add(att1val1);
+        return attribute1;
     }
 
     private static Element sign(Response response, Assertion ass) throws Exception {
@@ -186,7 +255,7 @@ public class SamlToolkit {
     }
 
     public static void main(String[] args) throws Exception {
-        createSamlResponse();
+        createSamlResponse("cf31badf-b9e1-40bd-aac9-1ac8beda0283","https://sts.windows.net/cf31badf-b9e1-40bd-aac9-1ac8beda0283/");
         verifySignature();
     }
 }
