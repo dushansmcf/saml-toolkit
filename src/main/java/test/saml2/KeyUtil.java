@@ -72,7 +72,7 @@ public class KeyUtil {
 
     public static void main(String[] args) throws Exception {
 //        readPrivateKeyFromFile("/home/sajith/scratch/saml-toolkit/src/main/resources/key.pem", "rsa");
-        readPublicKeyFromFile("/home/sajith/scratch/saml-toolkit/src/main/resources/pubkey.pem", "rsa");
+        readPublicKeyFromFile("/home/work/saml-toolkit/src/main/resources/pubkey.pem", "rsa");
     }
 
 }

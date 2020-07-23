@@ -8,6 +8,7 @@ import org.joda.time.DateTime;
 import org.opensaml.Configuration;
 import org.opensaml.DefaultBootstrap;
 import org.opensaml.common.SAMLObjectBuilder;
+import org.opensaml.common.xml.SAMLConstants;
 import org.opensaml.saml2.core.*;
 import org.opensaml.saml2.core.impl.*;
 import org.opensaml.saml2.metadata.EntitiesDescriptor;
@@ -31,6 +32,7 @@ import org.opensaml.saml2.core.Assertion;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
+import javax.xml.namespace.QName;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.Transformer;
@@ -87,29 +89,45 @@ public class SamlToolkit {
     public static void createSamlResponse(String tenantId,String metadataUri) throws Exception {
         org.opensaml.DefaultBootstrap.bootstrap();
         XMLObjectBuilderFactory builderFactory = Configuration.getBuilderFactory();
-        SAMLObjectBuilder<Response> responseBuilder = (SAMLObjectBuilder<Response>) builderFactory.getBuilder(Response.DEFAULT_ELEMENT_NAME);
+
+        // change the namespace "<saml2p:Response>" to "<samlp:Response>"
+        QName DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:protocol", "Response", "samlp");
+
+        ResponseBuilder responseBuilder = (ResponseBuilder) builderFactory.getBuilder(DEFAULT_ELEMENT_NAME);
+        //SAMLObjectBuilder<Response> responseBuilder = (SAMLObjectBuilder<Response>) builderFactory.getBuilder(Response.DEFAULT_ELEMENT_NAME);
         String inResponseTo = UUID.randomUUID().toString();
-        Response response = responseBuilder.buildObject();
+        Response response = responseBuilder.buildObject(DEFAULT_ELEMENT_NAME);
         response.setInResponseTo(inResponseTo);
 
-        StatusCode statusCode = new StatusCodeBuilder().buildObject();
-        statusCode.setValue("urn:oasis:names:tc:SAML:2.0:status:Success");
-        Status status = new StatusBuilder().buildObject();
-        status.setStatusCode(statusCode);
-        response.setStatus(status);
+        QName ASSERSION_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "Assertion", "");
 
         String assertionRef = UUID.randomUUID().toString();
-        SAMLObjectBuilder<Assertion> assertionsBuilder = (SAMLObjectBuilder<Assertion>) builderFactory.getBuilder(Assertion.DEFAULT_ELEMENT_NAME);
-        Assertion ass = assertionsBuilder.buildObject();
+        SAMLObjectBuilder<Assertion> assertionsBuilder = (SAMLObjectBuilder<Assertion>) builderFactory.getBuilder(ASSERSION_DEFAULT_ELEMENT_NAME);
+        Assertion ass = assertionsBuilder.buildObject(ASSERSION_DEFAULT_ELEMENT_NAME);
         ass.setID(assertionRef);
         ass.setIssueInstant(new DateTime());
 
-        Issuer issuer = new IssuerBuilder().buildObject();
+
+        QName ISSUER_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "Issuer", "");
+
+        Issuer issuer = new IssuerBuilder().buildObject(ISSUER_DEFAULT_ELEMENT_NAME);
         issuer.setValue("https://sts.windows.net/cf31badf-b9e1-40bd-aac9-1ac8beda0283/");
         ass.setIssuer(issuer);
 
-        Subject subject = new SubjectBuilder().buildObject(Subject.DEFAULT_ELEMENT_NAME);
-        NameID nameId = new NameIDBuilder().buildObject();
+        QName STATUS_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:protocol", "Status", "samlp");
+        QName STATUSCODE_DEFAULT_ELEMENT_NAME =  new QName("urn:oasis:names:tc:SAML:2.0:protocol", "StatusCode", "samlp");
+
+
+        StatusCode statusCode = new StatusCodeBuilder().buildObject(STATUSCODE_DEFAULT_ELEMENT_NAME);
+        statusCode.setValue("urn:oasis:names:tc:SAML:2.0:status:Success");
+        Status status = new StatusBuilder().buildObject(STATUS_DEFAULT_ELEMENT_NAME);
+        status.setStatusCode(statusCode);
+        response.setStatus(status);
+
+        QName SUBJECT_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "Subject", "");
+        QName NAMEID_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "NameID", "");
+        Subject subject = new SubjectBuilder().buildObject(SUBJECT_DEFAULT_ELEMENT_NAME);
+        NameID nameId = new NameIDBuilder().buildObject(NAMEID_DEFAULT_ELEMENT_NAME);
         SubjectConfirmationData subConfirmData = new SubjectConfirmationDataBuilder().buildObject();
         subConfirmData.setInResponseTo(inResponseTo);
         subConfirmData.setNotOnOrAfter(new DateTime().plusHours(1));
@@ -121,16 +139,20 @@ public class SamlToolkit {
 
         nameId.setValue(RandomStringUtils.randomAlphabetic(44));
         subject.setNameID(nameId);
+        subject.getSubjectConfirmations().add(subConfirm);
 
         ass.setSubject(subject);
 
-        Conditions condition = new ConditionsBuilder().buildObject();
+        QName CONDITIONS_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "Conditions", "");
+        Conditions condition = new ConditionsBuilder().buildObject(CONDITIONS_DEFAULT_ELEMENT_NAME);
         DateTime now = new DateTime();
         condition.setNotBefore(now.minusHours(1));
         condition.setNotOnOrAfter(now.plusHours(1));
         ass.setConditions(condition);
 
-        AttributeStatement as = new AttributeStatementBuilder().buildObject();
+        QName ATTRBUTE_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "AttributeStatement", "");
+
+        AttributeStatement as = new AttributeStatementBuilder().buildObject(ATTRBUTE_DEFAULT_ELEMENT_NAME);
 
         as.getAttributes().add(
                 createAttribute("http://schemas.microsoft.com/identity/claims/tenantid", tenantId));
@@ -138,16 +160,16 @@ public class SamlToolkit {
                 createAttribute("http://schemas.microsoft.com/identity/claims/objectidentifier",UUID.randomUUID().toString())
         );
         as.getAttributes().add(
-                createAttribute("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name", "Sajith.S@CreativeSoftware.com")
+                createAttribute("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name", "chanaka.a@CreativeSoftware.com")
         );
         as.getAttributes().add(
-                createAttribute("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname","Silva")
+                createAttribute("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname","Anuruddha")
         );
         as.getAttributes().add(
-                createAttribute("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname","Sajith")
+                createAttribute("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname","Chanaka")
         );
         as.getAttributes().add(
-                createAttribute("http://schemas.microsoft.com/identity/claims/displayname","Sajith Silva")
+                createAttribute("http://schemas.microsoft.com/identity/claims/displayname","Chanaka Anuruddha")
         );
         as.getAttributes().add(
                 createAttribute("http://schemas.microsoft.com/identity/claims/identityprovider",metadataUri)
@@ -158,12 +180,16 @@ public class SamlToolkit {
 
         ass.getAttributeStatements().add(as);
 
-        AuthnContextClassRef classRef = new AuthnContextClassRefBuilder().buildObject();
+        QName CLASSREF_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "AuthnContextClassRef", "");
+        QName CTX_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "AuthnContext", "");
+
+        AuthnContextClassRef classRef = new AuthnContextClassRefBuilder().buildObject(CLASSREF_DEFAULT_ELEMENT_NAME);
         classRef.setAuthnContextClassRef("urn:oasis:names:tc:SAML:2.0:ac:classes:Password");
-        AuthnContext ctx = new AuthnContextBuilder().buildObject();
+        AuthnContext ctx = new AuthnContextBuilder().buildObject(CTX_DEFAULT_ELEMENT_NAME);
         ctx.setAuthnContextClassRef(classRef);
 
-        AuthnStatement authnStatement = new  AuthnStatementBuilder().buildObject();
+        QName authnStatement_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "AuthnStatement", "");
+        AuthnStatement authnStatement = new  AuthnStatementBuilder().buildObject(authnStatement_DEFAULT_ELEMENT_NAME);
         authnStatement.setAuthnInstant(now);
         authnStatement.setSessionIndex(assertionRef);
         authnStatement.setAuthnContext(ctx);
@@ -179,20 +205,26 @@ public class SamlToolkit {
     }
 
     private static Attribute createAttribute(String name, String value) {
+        QName ATTRIBUTE_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "Attribute", "");
+
+        QName ATTRIBUTEVALUE_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "AttributeValue", "");
+
         XSString att1val1 = (XSString) Configuration.getBuilderFactory().getBuilder(XSString.TYPE_NAME).buildObject(
-                AttributeValue.DEFAULT_ELEMENT_NAME, XSString.TYPE_NAME);
+                ATTRIBUTEVALUE_DEFAULT_ELEMENT_NAME, XSString.TYPE_NAME);
         att1val1.setValue(value);
-        Attribute attribute1 = new AttributeBuilder().buildObject();
+        Attribute attribute1 = new AttributeBuilder().buildObject(ATTRIBUTE_DEFAULT_ELEMENT_NAME);
         attribute1.setName(name);
         attribute1.getAttributeValues().add(att1val1);
         return attribute1;
     }
 
     private static Element sign(Response response, Assertion ass) throws Exception {
+        QName SIGNATURE_DEFAULT_ELEMENT_NAME = new QName("http://www.w3.org/2000/09/xmldsig#", "Signature", "");
+
         Credential cred = getCredential();
         org.opensaml.xml.signature.Signature signature = (org.opensaml.xml.signature.Signature) Configuration.getBuilderFactory().getBuilder(
                 org.opensaml.xml.signature.Signature.DEFAULT_ELEMENT_NAME).buildObject(
-                org.opensaml.xml.signature.Signature.DEFAULT_ELEMENT_NAME);
+                SIGNATURE_DEFAULT_ELEMENT_NAME);
 
         signature.setSigningCredential(cred);
         signature.setSignatureAlgorithm(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA1);
@@ -206,7 +238,7 @@ public class SamlToolkit {
         KeyInfo keyInfo = null;
         keyInfo = keyInfoGenerator.generate(cred);
         signature.setKeyInfo(keyInfo);
-        SecurityHelper.prepareSignatureParams(signature, cred, null, "");
+        SecurityHelper.prepareSignatureParams(signature, cred, secConfiguration, "");
 
         ass.setSignature(signature);
         response.getAssertions().add(ass);
@@ -214,6 +246,7 @@ public class SamlToolkit {
         Element subjectElement = marshallerFactory.getMarshaller(response).marshall(response);
         Signer.signObject(signature);
         return subjectElement;
+
     }
 
     public static void verifySignature() throws Exception {
@@ -230,7 +263,7 @@ public class SamlToolkit {
         //Get Public Key
         BasicX509Credential publicCredential = new BasicX509Credential();
         PublicKey pubKey = KeyUtil.readPublicKeyFromFile("src/main/resources/pubkey.pem", "rsa");
-        X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(pubKey.getEncoded(), "rsa");
+        X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(pubKey.getEncoded());
         KeyFactory keyFactory = KeyFactory.getInstance("RSA");
         PublicKey key = keyFactory.generatePublic(publicKeySpec);
 
@@ -258,4 +291,5 @@ public class SamlToolkit {
         createSamlResponse("cf31badf-b9e1-40bd-aac9-1ac8beda0283","https://sts.windows.net/cf31badf-b9e1-40bd-aac9-1ac8beda0283/");
         verifySignature();
     }
+
 }
