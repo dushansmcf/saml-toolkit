@@ -84,6 +84,7 @@ public class SamlToolkit {
         BasicX509Credential basicCredential = new BasicX509Credential();
         basicCredential.setPrivateKey(pk);
         return basicCredential;
+
     }
 
     public static void createSamlResponse(String tenantId,String metadataUri) throws Exception {
@@ -92,15 +93,21 @@ public class SamlToolkit {
 
         // change the namespace "<saml2p:Response>" to "<samlp:Response>"
         QName DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:protocol", "Response", "samlp");
+        QName ISSUER_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "Issuer", "");
 
         ResponseBuilder responseBuilder = (ResponseBuilder) builderFactory.getBuilder(DEFAULT_ELEMENT_NAME);
         //SAMLObjectBuilder<Response> responseBuilder = (SAMLObjectBuilder<Response>) builderFactory.getBuilder(Response.DEFAULT_ELEMENT_NAME);
         String inResponseTo = UUID.randomUUID().toString();
         String destination = "https://sso-dev.pageroonline.com/authn/authentication/creative_ad_saml_authenticator";
         Response response = responseBuilder.buildObject(DEFAULT_ELEMENT_NAME);
+        response.setID(UUID.randomUUID().toString());
         response.setInResponseTo(inResponseTo);
         response.setDestination(destination);
         response.setIssueInstant(new DateTime());
+
+        Issuer issuer = new IssuerBuilder().buildObject(ISSUER_DEFAULT_ELEMENT_NAME);
+        issuer.setValue("https://sts.windows.net/cf31badf-b9e1-40bd-aac9-1ac8beda0283/");
+        response.setIssuer(issuer);
 
         QName ASSERSION_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "Assertion", "");
 
@@ -111,11 +118,9 @@ public class SamlToolkit {
         ass.setIssueInstant(new DateTime());
 
 
-        QName ISSUER_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "Issuer", "");
-
-        Issuer issuer = new IssuerBuilder().buildObject(ISSUER_DEFAULT_ELEMENT_NAME);
-        issuer.setValue("https://sts.windows.net/cf31badf-b9e1-40bd-aac9-1ac8beda0283/");
-        ass.setIssuer(issuer);
+        Issuer ass_issuer = new IssuerBuilder().buildObject(ISSUER_DEFAULT_ELEMENT_NAME);
+        ass_issuer.setValue("https://sts.windows.net/cf31badf-b9e1-40bd-aac9-1ac8beda0283/");
+        ass.setIssuer(ass_issuer);
 
         QName STATUS_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:protocol", "Status", "samlp");
         QName STATUSCODE_DEFAULT_ELEMENT_NAME =  new QName("urn:oasis:names:tc:SAML:2.0:protocol", "StatusCode", "samlp");
@@ -232,7 +237,7 @@ public class SamlToolkit {
                 SIGNATURE_DEFAULT_ELEMENT_NAME);
 
         signature.setSigningCredential(cred);
-        signature.setSignatureAlgorithm(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA1);
+        signature.setSignatureAlgorithm(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256);
         signature.setCanonicalizationAlgorithm(SignatureConstants.ALGO_ID_C14N_EXCL_OMIT_COMMENTS);
         SecurityConfiguration secConfiguration = Configuration.getGlobalSecurityConfiguration();
 
@@ -279,7 +284,6 @@ public class SamlToolkit {
             signatureValidator.validate(response.getAssertions().get(0).getSignature());
         }
     }
-
 
     public static void pirntResponse(Response response) throws Exception {
         MarshallerFactory marshallerFactory = Configuration.getMarshallerFactory();
