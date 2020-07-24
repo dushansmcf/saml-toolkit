@@ -96,8 +96,11 @@ public class SamlToolkit {
         ResponseBuilder responseBuilder = (ResponseBuilder) builderFactory.getBuilder(DEFAULT_ELEMENT_NAME);
         //SAMLObjectBuilder<Response> responseBuilder = (SAMLObjectBuilder<Response>) builderFactory.getBuilder(Response.DEFAULT_ELEMENT_NAME);
         String inResponseTo = UUID.randomUUID().toString();
+        String destination = "https://sso-dev.pageroonline.com/authn/authentication/creative_ad_saml_authenticator";
         Response response = responseBuilder.buildObject(DEFAULT_ELEMENT_NAME);
         response.setInResponseTo(inResponseTo);
+        response.setDestination(destination);
+        response.setIssueInstant(new DateTime());
 
         QName ASSERSION_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "Assertion", "");
 
@@ -126,14 +129,17 @@ public class SamlToolkit {
 
         QName SUBJECT_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "Subject", "");
         QName NAMEID_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "NameID", "");
+        QName CONFIRMATIONDATA_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "SubjectConfirmationData", "");
+        QName CONFIRMATION_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "SubjectConfirmation", "");
+
         Subject subject = new SubjectBuilder().buildObject(SUBJECT_DEFAULT_ELEMENT_NAME);
         NameID nameId = new NameIDBuilder().buildObject(NAMEID_DEFAULT_ELEMENT_NAME);
-        SubjectConfirmationData subConfirmData = new SubjectConfirmationDataBuilder().buildObject();
+        SubjectConfirmationData subConfirmData = new SubjectConfirmationDataBuilder().buildObject(CONFIRMATIONDATA_DEFAULT_ELEMENT_NAME);
         subConfirmData.setInResponseTo(inResponseTo);
         subConfirmData.setNotOnOrAfter(new DateTime().plusHours(1));
         subConfirmData.setRecipient("https://sso-dev.pageroonline.com/authn/authentication/creative_ad_saml_authenticator");
 
-        SubjectConfirmation subConfirm = new SubjectConfirmationBuilder().buildObject();
+        SubjectConfirmation subConfirm = new SubjectConfirmationBuilder().buildObject(CONFIRMATION_DEFAULT_ELEMENT_NAME);
         subConfirm.setMethod("urn:oasis:names:tc:SAML:2.0:cm:bearer");
         subConfirm.setSubjectConfirmationData(subConfirmData);
 
@@ -206,7 +212,6 @@ public class SamlToolkit {
 
     private static Attribute createAttribute(String name, String value) {
         QName ATTRIBUTE_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "Attribute", "");
-
         QName ATTRIBUTEVALUE_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "AttributeValue", "");
 
         XSString att1val1 = (XSString) Configuration.getBuilderFactory().getBuilder(XSString.TYPE_NAME).buildObject(
@@ -256,7 +261,7 @@ public class SamlToolkit {
         FileInputStream fis = new FileInputStream("test.saml.xml");
         Document inCommonMDDoc = ppMgr.parse(fis);
         Element metadataRoot = inCommonMDDoc.getDocumentElement();
-        // Get apropriate unmarshaller
+        //Get apropriate unmarshaller
         UnmarshallerFactory unmarshallerFactory = Configuration.getUnmarshallerFactory();
         Unmarshaller unmarshaller = unmarshallerFactory.getUnmarshaller(metadataRoot);
         Response response = (Response) unmarshaller.unmarshall(metadataRoot);
