@@ -13,6 +13,8 @@ import org.opensaml.saml2.core.*;
 import org.opensaml.saml2.core.impl.*;
 import org.opensaml.saml2.metadata.EntitiesDescriptor;
 import org.opensaml.xacml.ctx.impl.AttributeValueTypeImplBuilder;
+import org.opensaml.xml.XMLObject;
+import org.opensaml.xml.XMLObjectBuilder;
 import org.opensaml.xml.XMLObjectBuilderFactory;
 import org.opensaml.xml.io.MarshallerFactory;
 import org.opensaml.xml.io.Unmarshaller;
@@ -24,11 +26,10 @@ import org.opensaml.xml.security.SecurityHelper;
 import org.opensaml.xml.security.credential.Credential;
 import org.opensaml.xml.security.keyinfo.*;
 import org.opensaml.xml.security.x509.BasicX509Credential;
-import org.opensaml.xml.signature.KeyInfo;
-import org.opensaml.xml.signature.SignatureConstants;
-import org.opensaml.xml.signature.SignatureValidator;
-import org.opensaml.xml.signature.Signer;
+import org.opensaml.xml.signature.*;
 import org.opensaml.saml2.core.Assertion;
+import org.opensaml.xml.signature.Signature;
+import org.opensaml.xml.signature.Signer;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
@@ -43,14 +44,10 @@ import java.io.*;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.security.*;
-import java.security.cert.CertificateFactory;
-import java.security.cert.X509Certificate;
-import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.PublicKey;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
-import java.util.Random;
 import java.util.UUID;
-import java.util.stream.DoubleStream;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 
@@ -230,25 +227,46 @@ public class SamlToolkit {
 
     private static Element sign(Response response, Assertion ass) throws Exception {
         QName SIGNATURE_DEFAULT_ELEMENT_NAME = new QName("http://www.w3.org/2000/09/xmldsig#", "Signature", "");
+        QName kEYINFO_DEFAULT_ELEMENT_NAME = new QName("http://www.w3.org/2000/09/xmldsig#", "KeyInfo", "");
+        QName X509Data_DEFAULT_ELEMENT_NAME = new QName("http://www.w3.org/2000/09/xmldsig#", "X509Data", "");
+        QName CERT_DEFAULT_ELEMENT_NAME = new QName("http://www.w3.org/2000/09/xmldsig#", "X509Certificate", "");
+
 
         Credential cred = getCredential();
-        org.opensaml.xml.signature.Signature signature = (org.opensaml.xml.signature.Signature) Configuration.getBuilderFactory().getBuilder(
-                org.opensaml.xml.signature.Signature.DEFAULT_ELEMENT_NAME).buildObject(
-                SIGNATURE_DEFAULT_ELEMENT_NAME);
 
+//        org.opensaml.xml.signature.Signature signature = (org.opensaml.xml.signature.Signature) Configuration.getBuilderFactory().getBuilder(
+//                org.opensaml.xml.signature.Signature.DEFAULT_ELEMENT_NAME).buildObject(
+//                SIGNATURE_DEFAULT_ELEMENT_NAME);
+
+//        signature.setSigningCredential(cred);
+//        signature.setSignatureAlgorithm(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256);
+//        signature.setCanonicalizationAlgorithm(SignatureConstants.ALGO_ID_C14N_EXCL_OMIT_COMMENTS);
+//        SecurityConfiguration secConfiguration = Configuration.getGlobalSecurityConfiguration();
+//
+//        NamedKeyInfoGeneratorManager namedKeyInfoGeneratorManager = secConfiguration.getKeyInfoGeneratorManager();
+//        KeyInfoGeneratorManager keyInfoGeneratorManager = namedKeyInfoGeneratorManager.getDefaultManager();
+//        KeyInfoGeneratorFactory keyInfoGeneratorFactory = keyInfoGeneratorManager.getFactory(cred);
+//        KeyInfoGenerator keyInfoGenerator = keyInfoGeneratorFactory.newInstance();
+//        KeyInfo keyInfo = null;
+//        keyInfo = keyInfoGenerator.generate(cred);
+//        signature.setKeyInfo(keyInfo);
+//        SecurityHelper.prepareSignatureParams(signature, cred, secConfiguration, "");
+
+
+        Signature signature = (Signature) buildXMLObject(SIGNATURE_DEFAULT_ELEMENT_NAME);
         signature.setSigningCredential(cred);
         signature.setSignatureAlgorithm(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256);
         signature.setCanonicalizationAlgorithm(SignatureConstants.ALGO_ID_C14N_EXCL_OMIT_COMMENTS);
-        SecurityConfiguration secConfiguration = Configuration.getGlobalSecurityConfiguration();
 
-        NamedKeyInfoGeneratorManager namedKeyInfoGeneratorManager = secConfiguration.getKeyInfoGeneratorManager();
-        KeyInfoGeneratorManager keyInfoGeneratorManager = namedKeyInfoGeneratorManager.getDefaultManager();
-        KeyInfoGeneratorFactory keyInfoGeneratorFactory = keyInfoGeneratorManager.getFactory(cred);
-        KeyInfoGenerator keyInfoGenerator = keyInfoGeneratorFactory.newInstance();
-        KeyInfo keyInfo = null;
-        keyInfo = keyInfoGenerator.generate(cred);
+
+        KeyInfo keyInfo = (KeyInfo) buildXMLObject(kEYINFO_DEFAULT_ELEMENT_NAME);
+        X509Data data = (X509Data) buildXMLObject(X509Data_DEFAULT_ELEMENT_NAME);
+        X509Certificate cert = (X509Certificate) buildXMLObject(CERT_DEFAULT_ELEMENT_NAME);
+        cert.setValue("MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA+ecGIex9Bl4BjSQOBF1BVclPfSIhRQOk/ZRal8H8v1/mHJl5mb1uNGdJlrNI7gswtxBEK75uknxCVfv0NXb3i0EDCgMY1DkIYV5PlYRuDwKYgr3HbrEqwwZj08wxajtBLpy7A0toIlm3ZcWUwvC0nzCexsw32Edv6mel6P1+gm95ZhdhQnklTD7a016hkxxWUl1GNrvdcbqxR7468176MybtPcy0MvUycknM9fWj23m/L8kM2XOgopK/aU1rt7p6RWh0rY8dWDdk4J2/SQhLVSQD2dD0oqVweCrsRCVIkY4GsxQwrciUdVM5x39QN/yOn4tksaABos6j9rmYYSwnQP+o2eqxhrDQEAmsUcQXnLRPOnU1dWV2UA9kFU24fePuUI14jBiIN/l3sck8ze3pAJYsqkIsyv4yKsZIQLt48Lb3XN8b+myMSZxlUuYyOtfI3QbtLld+BO7YTGadaJG5n8AOunwhXlutrLnoi0c9bSuRBSf4a9f5GJQVjomNFO8pXVPeRXZiiCuroKQXLal1TS5efj1tMk4GkcdUyI3RC+6JsoDsU9jYqgb6Ur4UBb0dRifhigiif+LysDNA0KvVds670VG+psARm12NectJ6hbuCQ/q5ChmmTBUl6hRkqSTTm6HOYG/DAoZxjY333QPmXBPPNKiaIGIUJ4n1JMa5rMCAwEAAQ==");
+        data.getX509Certificates().add(cert);
+        keyInfo.getX509Datas().add(data);
         signature.setKeyInfo(keyInfo);
-        SecurityHelper.prepareSignatureParams(signature, cred, secConfiguration, "");
+
 
         ass.setSignature(signature);
         response.getAssertions().add(ass);
@@ -299,6 +317,15 @@ public class SamlToolkit {
     public static void main(String[] args) throws Exception {
         createSamlResponse("cf31badf-b9e1-40bd-aac9-1ac8beda0283","https://sts.windows.net/cf31badf-b9e1-40bd-aac9-1ac8beda0283/");
         verifySignature();
+    }
+
+    private static XMLObject buildXMLObject(QName objectQName) {
+
+        XMLObjectBuilder builder =
+                org.opensaml.xml.Configuration.getBuilderFactory()
+                        .getBuilder(objectQName);
+        return builder.buildObject(objectQName.getNamespaceURI(), objectQName.getLocalPart(),
+                objectQName.getPrefix());
     }
 
 }
