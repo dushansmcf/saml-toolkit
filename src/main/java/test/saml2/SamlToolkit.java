@@ -55,8 +55,13 @@ import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 
 public class SamlToolkit {
-    public static String decodeSAML_redirect(String payload) throws Exception {
-        byte[] data = Base64.getDecoder().decode(URLDecoder.decode(payload, "utf-8"));
+    public static String decodeSAML_redirect(String payload, boolean doUrlEncode) throws Exception {
+        String urlDecodePaylod = payload;
+        if (doUrlEncode) {
+            urlDecodePaylod = URLDecoder.decode(payload, "utf-8");
+        }
+
+        byte[] data = Base64.getDecoder().decode(urlDecodePaylod);
         return Util.inflate(data, true);
     }
 
@@ -123,7 +128,7 @@ public class SamlToolkit {
         ass.setIssuer(ass_issuer);
 
         QName STATUS_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:protocol", "Status", "samlp");
-        QName STATUSCODE_DEFAULT_ELEMENT_NAME =  new QName("urn:oasis:names:tc:SAML:2.0:protocol", "StatusCode", "samlp");
+        QName STATUSCODE_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:protocol", "StatusCode", "samlp");
 
 
         StatusCode statusCode = new StatusCodeBuilder().buildObject(STATUSCODE_DEFAULT_ELEMENT_NAME);
@@ -168,25 +173,25 @@ public class SamlToolkit {
         as.getAttributes().add(
                 createAttribute("http://schemas.microsoft.com/identity/claims/tenantid", tenantId));
         as.getAttributes().add(
-                createAttribute("http://schemas.microsoft.com/identity/claims/objectidentifier",UUID.randomUUID().toString())
+                createAttribute("http://schemas.microsoft.com/identity/claims/objectidentifier", UUID.randomUUID().toString())
         );
         as.getAttributes().add(
                 createAttribute("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name", "chanaka.a@CreativeSoftware.com")
         );
         as.getAttributes().add(
-                createAttribute("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname","Anuruddha")
+                createAttribute("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname", "Anuruddha")
         );
         as.getAttributes().add(
-                createAttribute("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname","Chanaka")
+                createAttribute("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname", "Chanaka")
         );
         as.getAttributes().add(
-                createAttribute("http://schemas.microsoft.com/identity/claims/displayname","Chanaka Anuruddha")
+                createAttribute("http://schemas.microsoft.com/identity/claims/displayname", "Chanaka Anuruddha")
         );
         as.getAttributes().add(
-                createAttribute("http://schemas.microsoft.com/identity/claims/identityprovider",metadataUri)
+                createAttribute("http://schemas.microsoft.com/identity/claims/identityprovider", metadataUri)
         );
         as.getAttributes().add(
-                createAttribute("http://schemas.microsoft.com/claims/authnmethodsreferences","http://schemas.microsoft.com/ws/2008/06/identity/authenticationmethod/password")
+                createAttribute("http://schemas.microsoft.com/claims/authnmethodsreferences", "http://schemas.microsoft.com/ws/2008/06/identity/authenticationmethod/password")
         );
 
         ass.getAttributeStatements().add(as);
@@ -200,19 +205,14 @@ public class SamlToolkit {
         ctx.setAuthnContextClassRef(classRef);
 
         QName authnStatement_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "AuthnStatement", "");
-        AuthnStatement authnStatement = new  AuthnStatementBuilder().buildObject(authnStatement_DEFAULT_ELEMENT_NAME);
+        AuthnStatement authnStatement = new AuthnStatementBuilder().buildObject(authnStatement_DEFAULT_ELEMENT_NAME);
         authnStatement.setAuthnInstant(now);
         authnStatement.setSessionIndex(assertionRef);
         authnStatement.setAuthnContext(ctx);
 
         ass.getAuthnStatements().add(authnStatement);
-        Element subjectElement = sign(response, ass);
-
-        TransformerFactory transformerFactory = TransformerFactory.newInstance();
-        Transformer transformer = transformerFactory.newTransformer();
-        DOMSource source = new DOMSource(subjectElement);
-        StreamResult result = new StreamResult(new FileWriter("test.saml.xml"));
-        transformer.transform(source, result);
+        sign(response, ass);
+        return response;
     }
 
     private static Attribute createAttribute(String name, String value) {
@@ -234,30 +234,7 @@ public class SamlToolkit {
         QName X509Data_DEFAULT_ELEMENT_NAME = new QName("http://www.w3.org/2000/09/xmldsig#", "X509Data", "");
         QName CERT_DEFAULT_ELEMENT_NAME = new QName("http://www.w3.org/2000/09/xmldsig#", "X509Certificate", "");
 
-
         Credential cred = getCredential();
-        org.opensaml.xml.signature.Signature signature = (org.opensaml.xml.signature.Signature) Configuration.getBuilderFactory().getBuilder(
-                org.opensaml.xml.signature.Signature.DEFAULT_ELEMENT_NAME).buildObject(
-                SIGNATURE_DEFAULT_ELEMENT_NAME);
-
-//        org.opensaml.xml.signature.Signature signature = (org.opensaml.xml.signature.Signature) Configuration.getBuilderFactory().getBuilder(
-//                org.opensaml.xml.signature.Signature.DEFAULT_ELEMENT_NAME).buildObject(
-//                SIGNATURE_DEFAULT_ELEMENT_NAME);
-
-//        signature.setSigningCredential(cred);
-//        signature.setSignatureAlgorithm(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256);
-//        signature.setCanonicalizationAlgorithm(SignatureConstants.ALGO_ID_C14N_EXCL_OMIT_COMMENTS);
-//        SecurityConfiguration secConfiguration = Configuration.getGlobalSecurityConfiguration();
-//
-//        NamedKeyInfoGeneratorManager namedKeyInfoGeneratorManager = secConfiguration.getKeyInfoGeneratorManager();
-//        KeyInfoGeneratorManager keyInfoGeneratorManager = namedKeyInfoGeneratorManager.getDefaultManager();
-//        KeyInfoGeneratorFactory keyInfoGeneratorFactory = keyInfoGeneratorManager.getFactory(cred);
-//        KeyInfoGenerator keyInfoGenerator = keyInfoGeneratorFactory.newInstance();
-//        KeyInfo keyInfo = null;
-//        keyInfo = keyInfoGenerator.generate(cred);
-//        signature.setKeyInfo(keyInfo);
-//        SecurityHelper.prepareSignatureParams(signature, cred, secConfiguration, "");
-
 
         Signature signature = (Signature) buildXMLObject(SIGNATURE_DEFAULT_ELEMENT_NAME);
         signature.setSigningCredential(cred);
@@ -308,8 +285,7 @@ public class SamlToolkit {
         }
     }
 
-
-    public static void pirntResponse(Response response) throws Exception {
+    public static String toString(Response response) throws Exception {
         MarshallerFactory marshallerFactory = Configuration.getMarshallerFactory();
         Element responseElement = marshallerFactory.getMarshaller(response).marshall(response);
         TransformerFactory transformerFactory = TransformerFactory.newInstance();
@@ -317,12 +293,12 @@ public class SamlToolkit {
         DOMSource source = new DOMSource(responseElement);
         StreamResult result = new StreamResult(new StringWriter());
         transformer.transform(source, result);
-        System.out.println(result.getWriter().toString());
+        return result.getWriter().toString();
     }
 
     public static void main(String[] args) throws Exception {
-        createSamlResponse("cf31badf-b9e1-40bd-aac9-1ac8beda0283","https://sts.windows.net/cf31badf-b9e1-40bd-aac9-1ac8beda0283/");
-        verifySignature();
+        createSamlResponse("cf31badf-b9e1-40bd-aac9-1ac8beda0283", "https://sts.windows.net/cf31badf-b9e1-40bd-aac9-1ac8beda0283/");
+        verifySignature("test.saml.xml");
     }
 
     private static XMLObject buildXMLObject(QName objectQName) {
@@ -333,5 +309,4 @@ public class SamlToolkit {
         return builder.buildObject(objectQName.getNamespaceURI(), objectQName.getLocalPart(),
                 objectQName.getPrefix());
     }
-
 }
