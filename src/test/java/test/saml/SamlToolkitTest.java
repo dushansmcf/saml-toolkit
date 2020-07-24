@@ -1,13 +1,18 @@
 package test.saml;
 
-import org.bouncycastle.util.encoders.Base64;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import test.saml2.SamlToolkit;
+import test.saml2.Util;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.net.URI;
 import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.util.Base64;
 
 public class SamlToolkitTest {
     String redirectSAML_Payload = "fZJRb9sgFIXf9yss3rGB2Aqg2FW2qlqlTosadw97iQBfp0g2ZICj%2Ffw5TqtmL31BIA7fufceNnd%2FxyE7Q4jWuxrRnKAMnPGddccavbQPmKO75ssmqnFgJ7md0qt7hj8TxJRtY4SQ5nffvIvTCGEP4WwNvDw%2F1eg1pVOURRGjxx2c85M6QvDeDdZBbvxYqAtqWcEla9QFVJgA8%2BYMB9UdLpaHm3sfUHY%2F%2B1q3aD8sBn%2B0Lh%2BtCT76Pt14mH5Ftep6rAVQXBLdYaWMwFQZrqFThPFVsbSGsgcfDCz91SiFCVD2eF%2BjA%2B00FwQ0rqp%2BRnSsx0KVCgteVSU3DDTXszTGCR5dTMqlGjHCCCZrTNct4bJisuS5oOI3ynbBJ2%2F88NW664Sn4KRX0Ubp1AhRJiP32x9PkuVE6qsoyu9tu8O7n%2FsWZb%2Fek2KXpObsXJTXbD5nnd6MUXONUi4Vh1vC5wD1HjZqaNmzqlsRbED3uCz7cp4GM5itqSGCMkLWYlPc2jRvx%2F8%2FUPMP";
@@ -18,6 +23,16 @@ public class SamlToolkitTest {
     String postSAML = "<samlp:Response ID=\"_800e5692-06e5-4f0c-8913-4f56e91edaf7\" Version=\"2.0\" IssueInstant=\"2020-07-17T08:53:28.469Z\" Destination=\"https://sso-dev.pageroonline.com/authn/authentication/creative_ad_saml_authenticator\" InResponseTo=\"_1db890eb-55f1-4d2f-9a4a-985548c2eb8b\" xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\"><Issuer xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\">https://sts.windows.net/cf31badf-b9e1-40bd-aac9-1ac8beda0283/</Issuer><samlp:Status><samlp:StatusCode Value=\"urn:oasis:names:tc:SAML:2.0:status:Success\"/></samlp:Status><Assertion ID=\"_54be0608-a850-4ca8-abc5-238a5a740203\" IssueInstant=\"2020-07-17T08:53:28.469Z\" Version=\"2.0\" xmlns=\"urn:oasis:names:tc:SAML:2.0:assertion\"><Issuer>https://sts.windows.net/cf31badf-b9e1-40bd-aac9-1ac8beda0283/</Issuer><Signature xmlns=\"http://www.w3.org/2000/09/xmldsig#\"><SignedInfo><CanonicalizationMethod Algorithm=\"http://www.w3.org/2001/10/xml-exc-c14n#\"/><SignatureMethod Algorithm=\"http://www.w3.org/2001/04/xmldsig-more#rsa-sha256\"/><Reference URI=\"#_54be0608-a850-4ca8-abc5-238a5a740203\"><Transforms><Transform Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\"/><Transform Algorithm=\"http://www.w3.org/2001/10/xml-exc-c14n#\"/></Transforms><DigestMethod Algorithm=\"http://www.w3.org/2001/04/xmlenc#sha256\"/><DigestValue>1eWp4GLLrqnotbmQN5yUxBATfGnzHSBBlv0+t7n+sqE=</DigestValue></Reference></SignedInfo><SignatureValue>C0VdtlXTkOFUxGinVgyDwC4zH22bOEYjR3gYeLxQvGup0nqfBdirEo4t70Mhc3b4gU/l8eQ2EU2LSM5MY+Y1IUx74Tpo85s4xsMJPCTBFXsGBxEtYjwFlYmwbPp/eTJyTO3h9ZG9my1dKOHm5UrRt1WDOmp/tk+F0kglaUJJ+pryWMxufnndGakekB3xnoFZ8wC+nQQExcT9D/QcSXz12yoMxiQEX63AgCPbPDxPq6ppmnf2ZfdTd5+dTVm+ZO0IOrLlIrbefWDW8+BHcA3nnRc86kVEJsw6GgUHyUs3VoO9bmpIOMGGdW/bmDwb7WIypnHdC+F4Sucnyx427Npygw==</SignatureValue><KeyInfo><X509Data><X509Certificate>MIIDBTCCAe2gAwIBAgIQPCxFbySVSLZOggeWRzBWOjANBgkqhkiG9w0BAQsFADAtMSswKQYDVQQDEyJhY2NvdW50cy5hY2Nlc3Njb250cm9sLndpbmRvd3MubmV0MB4XDTIwMDYwNzAwMDAwMFoXDTI1MDYwNzAwMDAwMFowLTErMCkGA1UEAxMiYWNjb3VudHMuYWNjZXNzY29udHJvbC53aW5kb3dzLm5ldDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAOpZXSpuUXP7zCmtUTP07VL97ZrY+dsC0ayartd8hjN/4dHcK7tmT+d8uucA38+v7Swo6GLkQrlbI6Ft+/tM11DkSb2dC/dAgF/ufJVuzXBOGwMwNaV7+6EfZEMNF/HadGrVOB5x3mk1PC2cXIyTu/fx/XMYMGvnJSnxsZZXKLPE7LrqzPMYtnceVasM6jTAdrOtpdzEzewM3LR1IkAol9oiQKxowIbPpsUtcJsjCMjkoqXaHYY0FkQHLHlvmhVckUxVYvKJJdnE9RyYz13cdG9VqmEjs3kXa6y1HANKEdk86e8czmCWUhjZzS0KmvX+oeoedl219IgIMSoBA5UaWycCAwEAAaMhMB8wHQYDVR0OBBYEFFXP0ODFhjf3RS6oRijM5Tb+yB8CMA0GCSqGSIb3DQEBCwUAA4IBAQB9GtVikLTbJWIu5x9YCUTTKzNhi44XXogP/v8VylRSUHI5YTMdnWwvDIt/Y1sjNonmSy9PrioEjcIiI1U8nicveafMwIq5VLn+gEY2lg6KDJAzgAvA88CXqwfHHvtmYBovN7goolp8TY/kddMTf6TpNzN3lCTM2MK4Ye5xLLVGdp4bqWCOJ/qjwDxpTRSydYIkLUDwqNjv+sYfOElJpYAB4rTL/aw3ChJ1iaA4MtXEt6OjbUtbOa21lShfLzvNRbYK3+ukbrhmRl9lemJEeUls51vPuIe+jg+Ssp43aw7PQjxt4/MpfNMS2BfZ5F8GVSVG7qNb352cLLeJg5rc398Z</X509Certificate></X509Data></KeyInfo></Signature><Subject><NameID Format=\"urn:oasis:names:tc:SAML:2.0:nameid-format:persistent\">n6bsKKyyOapYpHEqqVL0dmuENasjZJhhKYzy7OEeAeo</NameID><SubjectConfirmation Method=\"urn:oasis:names:tc:SAML:2.0:cm:bearer\"><SubjectConfirmationData InResponseTo=\"_1db890eb-55f1-4d2f-9a4a-985548c2eb8b\" NotOnOrAfter=\"2020-07-17T09:53:28.391Z\" Recipient=\"https://sso-dev.pageroonline.com/authn/authentication/creative_ad_saml_authenticator\"/></SubjectConfirmation></Subject><Conditions NotBefore=\"2020-07-17T08:48:28.391Z\" NotOnOrAfter=\"2020-07-17T09:53:28.391Z\"><AudienceRestriction><Audience>spn:14f25d30-cebf-44f4-982c-271c09120079</Audience></AudienceRestriction></Conditions><AttributeStatement><Attribute Name=\"http://schemas.microsoft.com/identity/claims/tenantid\"><AttributeValue>cf31badf-b9e1-40bd-aac9-1ac8beda0283</AttributeValue></Attribute><Attribute Name=\"http://schemas.microsoft.com/identity/claims/objectidentifier\"><AttributeValue>d78a0d75-ef69-45a2-8fb2-64746e5b61dc</AttributeValue></Attribute><Attribute Name=\"http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name\"><AttributeValue>Sajith.S@CreativeSoftware.com</AttributeValue></Attribute><Attribute Name=\"http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname\"><AttributeValue>Silva</AttributeValue></Attribute><Attribute Name=\"http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname\"><AttributeValue>Sajith</AttributeValue></Attribute><Attribute Name=\"http://schemas.microsoft.com/identity/claims/displayname\"><AttributeValue>Sajith Silva</AttributeValue></Attribute><Attribute Name=\"http://schemas.microsoft.com/identity/claims/identityprovider\"><AttributeValue>https://sts.windows.net/cf31badf-b9e1-40bd-aac9-1ac8beda0283/</AttributeValue></Attribute><Attribute Name=\"http://schemas.microsoft.com/claims/authnmethodsreferences\"><AttributeValue>http://schemas.microsoft.com/ws/2008/06/identity/authenticationmethod/password</AttributeValue></Attribute></AttributeStatement><AuthnStatement AuthnInstant=\"2020-07-17T08:53:22.791Z\" SessionIndex=\"_54be0608-a850-4ca8-abc5-238a5a740203\"><AuthnContext><AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:Password</AuthnContextClassRef></AuthnContext></AuthnStatement></Assertion></samlp:Response>";
 
     @Test
+    public void testEncodeAndThenDecode() throws Exception {
+        byte[] deflated = Util.deflate(redirectSAML.getBytes("utf-8"));
+        byte[] b64enc = Base64.getEncoder().encode(deflated);
+        System.out.println(new String(b64enc, "utf-8"));
+        String uenc = URLEncoder.encode(new String(b64enc, "utf-8"), "utf-8");
+        System.out.println(uenc);
+        System.out.println(SamlToolkit.decodeSAML_redirect(uenc, true));
+    }
+
+    @Test
     public void testPost_SAML_decode() throws Exception {
         String saml = SamlToolkit.decodeSAML_POST(postSAML_Payload);
         Assert.assertEquals(saml, postSAML);
@@ -25,7 +40,7 @@ public class SamlToolkitTest {
 
     @Test
     public void testRedirectSAML_decode() throws Exception {
-        String saml = SamlToolkit.decodeSAML_redirect(redirectSAML_Payload);
+        String saml = SamlToolkit.decodeSAML_redirect(redirectSAML_Payload, true);
         Assert.assertEquals(saml, redirectSAML);
     }
 
@@ -33,19 +48,31 @@ public class SamlToolkitTest {
     @Test
     public void test_encode_SAML_redirect() throws Exception {
         String data = SamlToolkit.encodeSAML_redirect(redirectSAML);
-        Assert.assertEquals(data,redirectSAML_Payload);
+        Assert.assertEquals(data, redirectSAML_Payload);
     }
 
     @Test
     public void test_encode_SAML_post() throws Exception {
         String data = SamlToolkit.encodeSAML_post(postSAML);
-        Assert.assertEquals(data,postSAML_Payload);
+        Assert.assertEquals(data, postSAML_Payload);
     }
 
     @Test
     public void test_encode_signed_SAML_post() throws Exception {
         String data = SamlToolkit.encodeSAML_post(postSAML);
-        Assert.assertEquals(data,postSAML_Payload);
+        Assert.assertEquals(data, postSAML_Payload);
+    }
+
+    @Test
+    public void testXXX() {
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://dev.localhost:9998/saml/"))
+                .build();
+        client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .thenApply(HttpResponse::body)
+                .thenAccept(System.out::println)
+                .join();
     }
 
 }

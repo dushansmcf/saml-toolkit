@@ -6,11 +6,10 @@ import org.apache.xml.security.utils.Base64;
 import org.opensaml.ws.message.decoder.MessageDecodingException;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.zip.DataFormatException;
-import java.util.zip.Inflater;
-import java.util.zip.InflaterInputStream;
+import java.util.zip.*;
 
 
 public class Util {
@@ -26,6 +25,15 @@ public class Util {
 
     public static byte[] decodeBase64b(String b64Data) throws Base64DecodingException {
         return Base64.decode(b64Data);
+    }
+
+    public static byte[] deflate(byte[] payload) throws IOException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        Deflater deflater = new Deflater(Deflater.DEFLATED,true);
+        DeflaterOutputStream dos = new DeflaterOutputStream(bos,deflater);
+        dos.write(payload);
+        dos.finish();
+        return bos.toByteArray();
     }
 
     public static String inflate(byte[] deflatedData, boolean supportGzipCompression) throws Exception {

@@ -30,6 +30,7 @@ import org.opensaml.xml.signature.*;
 import org.opensaml.saml2.core.Assertion;
 import org.opensaml.xml.signature.Signature;
 import org.opensaml.xml.signature.Signer;
+import org.opensaml.saml2.core.Assertion;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
@@ -47,7 +48,9 @@ import java.security.*;
 import java.security.PublicKey;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
+import java.util.Random;
 import java.util.UUID;
+import java.util.stream.DoubleStream;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 
@@ -84,7 +87,7 @@ public class SamlToolkit {
 
     }
 
-    public static void createSamlResponse(String tenantId,String metadataUri) throws Exception {
+    public static Response createSamlResponse(String tenantId, String metadataUri) throws Exception {
         org.opensaml.DefaultBootstrap.bootstrap();
         XMLObjectBuilderFactory builderFactory = Configuration.getBuilderFactory();
 
@@ -225,7 +228,7 @@ public class SamlToolkit {
         return attribute1;
     }
 
-    private static Element sign(Response response, Assertion ass) throws Exception {
+    private static void sign(Response response, Assertion ass) throws Exception {
         QName SIGNATURE_DEFAULT_ELEMENT_NAME = new QName("http://www.w3.org/2000/09/xmldsig#", "Signature", "");
         QName kEYINFO_DEFAULT_ELEMENT_NAME = new QName("http://www.w3.org/2000/09/xmldsig#", "KeyInfo", "");
         QName X509Data_DEFAULT_ELEMENT_NAME = new QName("http://www.w3.org/2000/09/xmldsig#", "X509Data", "");
@@ -233,6 +236,9 @@ public class SamlToolkit {
 
 
         Credential cred = getCredential();
+        org.opensaml.xml.signature.Signature signature = (org.opensaml.xml.signature.Signature) Configuration.getBuilderFactory().getBuilder(
+                org.opensaml.xml.signature.Signature.DEFAULT_ELEMENT_NAME).buildObject(
+                SIGNATURE_DEFAULT_ELEMENT_NAME);
 
 //        org.opensaml.xml.signature.Signature signature = (org.opensaml.xml.signature.Signature) Configuration.getBuilderFactory().getBuilder(
 //                org.opensaml.xml.signature.Signature.DEFAULT_ELEMENT_NAME).buildObject(
@@ -257,6 +263,7 @@ public class SamlToolkit {
         signature.setSigningCredential(cred);
         signature.setSignatureAlgorithm(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256);
         signature.setCanonicalizationAlgorithm(SignatureConstants.ALGO_ID_C14N_EXCL_OMIT_COMMENTS);
+        SecurityConfiguration secConfiguration = Configuration.getGlobalSecurityConfiguration();
 
 
         KeyInfo keyInfo = (KeyInfo) buildXMLObject(kEYINFO_DEFAULT_ELEMENT_NAME);
@@ -266,22 +273,20 @@ public class SamlToolkit {
         data.getX509Certificates().add(cert);
         keyInfo.getX509Datas().add(data);
         signature.setKeyInfo(keyInfo);
-
+        SecurityHelper.prepareSignatureParams(signature, cred, secConfiguration, "");
 
         ass.setSignature(signature);
         response.getAssertions().add(ass);
         MarshallerFactory marshallerFactory = Configuration.getMarshallerFactory();
-        Element subjectElement = marshallerFactory.getMarshaller(response).marshall(response);
+        marshallerFactory.getMarshaller(response).marshall(response);
         Signer.signObject(signature);
-        return subjectElement;
-
     }
 
-    public static void verifySignature() throws Exception {
+    public static void verifySignature(String filename) throws Exception {
         DefaultBootstrap.bootstrap();
         BasicParserPool ppMgr = new BasicParserPool();
         ppMgr.setNamespaceAware(true);
-        FileInputStream fis = new FileInputStream("test.saml.xml");
+        FileInputStream fis = new FileInputStream(filename);
         Document inCommonMDDoc = ppMgr.parse(fis);
         Element metadataRoot = inCommonMDDoc.getDocumentElement();
         //Get apropriate unmarshaller
@@ -302,6 +307,7 @@ public class SamlToolkit {
             signatureValidator.validate(response.getAssertions().get(0).getSignature());
         }
     }
+
 
     public static void pirntResponse(Response response) throws Exception {
         MarshallerFactory marshallerFactory = Configuration.getMarshallerFactory();
