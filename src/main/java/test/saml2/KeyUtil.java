@@ -3,14 +3,14 @@ package test.saml2;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemReader;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.security.spec.EncodedKeySpec;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
@@ -67,6 +67,11 @@ public class KeyUtil {
     public static PrivateKey readPrivateKeyFromFile(String filepath, String algorithm) throws IOException {
         byte[] bytes = KeyUtil.parsePEMFile(new File(filepath));
         return KeyUtil.getPrivateKey(bytes, algorithm);
+    }
+
+    public static X509Certificate readX509CertificateFromFile(String file) throws IOException, CertificateException {
+        CertificateFactory f = CertificateFactory.getInstance("x509");
+        return (X509Certificate) f.generateCertificate(new FileInputStream(file));
     }
 
 

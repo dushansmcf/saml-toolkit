@@ -88,6 +88,7 @@ public class SamlToolkit {
         PrivateKey pk = KeyUtil.readPrivateKeyFromFile("src/main/resources/key.pem", "rsa");
         BasicX509Credential basicCredential = new BasicX509Credential();
         basicCredential.setPrivateKey(pk);
+        basicCredential.setEntityCertificate(KeyUtil.readX509CertificateFromFile("/home/sajith/scratch/saml-toolkit/src/main/resources/dev.localhost.crt"));
         return basicCredential;
 
     }
@@ -244,8 +245,6 @@ public class SamlToolkit {
         X509KeyInfoGeneratorFactory x509Factory = new X509KeyInfoGeneratorFactory();
         x509Factory.setEmitEntityCertificate(true);
         x509Factory.setEmitEntityCertificateChain(true);
-        x509Factory.setEmitX509IssuerSerial(true);
-        x509Factory.setEmitX509SubjectName(true);
         Configuration.getGlobalSecurityConfiguration().getKeyInfoGeneratorManager().registerFactory("x509emitingKeyInfoGenerator", x509Factory);
 
         signature.setSigningCredential(cred);
