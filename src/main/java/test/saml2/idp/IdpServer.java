@@ -59,6 +59,7 @@ class SamlRequestHandler extends AbstractHandler {
                             samlResponsePlain+
                             "</textarea>\n" +
                             "<form method=\"post\" action=\"https://sso-dev.pageroonline.com/authn/authentication/creative_ad_saml_authenticator/\">\n" +
+//                            "<form method=\"post\" action=\"http://dev.localhost:8088/authn/authentication/creative_ad_saml_authenticator/\">\n" +
                            "<H1> Response generated (B64 enc)<H1>\n" +
                             "<textarea id=\"w3review\" name=\"SAMLResponse\" rows=\"4\" cols=\"50\">\n" +
                             samlResponse +

@@ -165,6 +165,11 @@ public class SamlToolkit {
         DateTime now = new DateTime();
         condition.setNotBefore(now.minusHours(1));
         condition.setNotOnOrAfter(now.plusHours(1));
+        AudienceRestriction audRestriction = new AudienceRestrictionBuilder().buildObject();
+        Audience audience = new AudienceBuilder().buildObject();
+        audience.setAudienceURI("XXX");
+        audRestriction.getAudiences().add(audience);
+        condition.getAudienceRestrictions().add(audRestriction);
         ass.setConditions(condition);
 
         QName ATTRBUTE_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "AttributeStatement", "");
