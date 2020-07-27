@@ -84,12 +84,11 @@ public class SamlToolkit {
         return URLEncoder.encode(Base64.getEncoder().encodeToString(xml.getBytes()), "utf-8");
     }
 
-    private static Credential getCredential() throws Exception {
+    private static BasicX509Credential getCredential() throws Exception {
         PrivateKey pk = KeyUtil.readPrivateKeyFromFile("src/main/resources/key.pem", "rsa");
         BasicX509Credential basicCredential = new BasicX509Credential();
         basicCredential.setPrivateKey(pk);
         return basicCredential;
-
     }
 
     public static Response createSamlResponse(String tenantId, String metadataUri) throws Exception {
@@ -234,7 +233,7 @@ public class SamlToolkit {
         QName X509Data_DEFAULT_ELEMENT_NAME = new QName("http://www.w3.org/2000/09/xmldsig#", "X509Data", "");
         QName CERT_DEFAULT_ELEMENT_NAME = new QName("http://www.w3.org/2000/09/xmldsig#", "X509Certificate", "");
 
-        Credential cred = getCredential();
+        BasicX509Credential cred = getCredential();
 
         Signature signature = (Signature) buildXMLObject(SIGNATURE_DEFAULT_ELEMENT_NAME);
         signature.setSigningCredential(cred);
@@ -246,7 +245,8 @@ public class SamlToolkit {
         KeyInfo keyInfo = (KeyInfo) buildXMLObject(kEYINFO_DEFAULT_ELEMENT_NAME);
         X509Data data = (X509Data) buildXMLObject(X509Data_DEFAULT_ELEMENT_NAME);
         X509Certificate cert = (X509Certificate) buildXMLObject(CERT_DEFAULT_ELEMENT_NAME);
-        cert.setValue("MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA+ecGIex9Bl4BjSQOBF1BVclPfSIhRQOk/ZRal8H8v1/mHJl5mb1uNGdJlrNI7gswtxBEK75uknxCVfv0NXb3i0EDCgMY1DkIYV5PlYRuDwKYgr3HbrEqwwZj08wxajtBLpy7A0toIlm3ZcWUwvC0nzCexsw32Edv6mel6P1+gm95ZhdhQnklTD7a016hkxxWUl1GNrvdcbqxR7468176MybtPcy0MvUycknM9fWj23m/L8kM2XOgopK/aU1rt7p6RWh0rY8dWDdk4J2/SQhLVSQD2dD0oqVweCrsRCVIkY4GsxQwrciUdVM5x39QN/yOn4tksaABos6j9rmYYSwnQP+o2eqxhrDQEAmsUcQXnLRPOnU1dWV2UA9kFU24fePuUI14jBiIN/l3sck8ze3pAJYsqkIsyv4yKsZIQLt48Lb3XN8b+myMSZxlUuYyOtfI3QbtLld+BO7YTGadaJG5n8AOunwhXlutrLnoi0c9bSuRBSf4a9f5GJQVjomNFO8pXVPeRXZiiCuroKQXLal1TS5efj1tMk4GkcdUyI3RC+6JsoDsU9jYqgb6Ur4UBb0dRifhigiif+LysDNA0KvVds670VG+psARm12NectJ6hbuCQ/q5ChmmTBUl6hRkqSTTm6HOYG/DAoZxjY333QPmXBPPNKiaIGIUJ4n1JMa5rMCAwEAAQ==");
+        String value = org.apache.xml.security.utils.Base64.encode(cred.getEntityCertificate().getEncoded());
+        cert.setValue("value"); // TODO: this value is null. have to set the certificate << cred.setEntityCertificate() >>.
         data.getX509Certificates().add(cert);
         keyInfo.getX509Datas().add(data);
         signature.setKeyInfo(keyInfo);
