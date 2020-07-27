@@ -79,7 +79,7 @@ public class SamlToolkit {
     private static Credential getCredential() throws Exception {
         PrivateKey pk = KeyUtil.readPrivateKeyFromFile("src/main/resources/key.pem", "rsa");
         CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
-        X509Certificate cert = (X509Certificate)certificateFactory.generateCertificate(new FileInputStream(
+        X509Certificate cert = (X509Certificate) certificateFactory.generateCertificate(new FileInputStream(
                 "/home/sajith/scratch/saml-toolkit/src/main/resources/dev.localhost.crt"));
         BasicX509Credential basicCredential = new BasicX509Credential();
         basicCredential.setPrivateKey(pk);
@@ -101,10 +101,11 @@ public class SamlToolkit {
         String inResponseTo = UUID.randomUUID().toString();
         String destination = "https://sso-dev.pageroonline.com/authn/authentication/creative_ad_saml_authenticator";
         Response response = responseBuilder.buildObject(DEFAULT_ELEMENT_NAME);
-        response.setID(UUID.randomUUID().toString());
         response.setInResponseTo(inResponseTo);
+        response.setID(UUID.randomUUID().toString());
         response.setDestination(destination);
         response.setIssueInstant(new DateTime());
+        response.setID("_" + UUID.randomUUID().toString());
 
         Issuer issuer = new IssuerBuilder().buildObject(ISSUER_DEFAULT_ELEMENT_NAME);
         issuer.setValue(metadataUri);
@@ -115,7 +116,7 @@ public class SamlToolkit {
         String assertionRef = UUID.randomUUID().toString();
         SAMLObjectBuilder<Assertion> assertionsBuilder = (SAMLObjectBuilder<Assertion>) builderFactory.getBuilder(ASSERSION_DEFAULT_ELEMENT_NAME);
         Assertion ass = assertionsBuilder.buildObject(ASSERSION_DEFAULT_ELEMENT_NAME);
-        ass.setID(assertionRef);
+        ass.setID("_" + assertionRef);
         ass.setIssueInstant(new DateTime());
 
 
@@ -203,7 +204,7 @@ public class SamlToolkit {
         QName authnStatement_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "AuthnStatement", "");
         AuthnStatement authnStatement = new AuthnStatementBuilder().buildObject(authnStatement_DEFAULT_ELEMENT_NAME);
         authnStatement.setAuthnInstant(now);
-        authnStatement.setSessionIndex(assertionRef);
+        authnStatement.setSessionIndex("_"+ assertionRef);
         authnStatement.setAuthnContext(ctx);
 
         ass.getAuthnStatements().add(authnStatement);
@@ -233,9 +234,9 @@ public class SamlToolkit {
 
         X509KeyInfoGeneratorFactory x509Factory = new X509KeyInfoGeneratorFactory();
         x509Factory.setEmitEntityCertificate(true);
-        x509Factory.setEmitEntityCertificateChain(true);
-        x509Factory.setEmitX509IssuerSerial(true);
-        x509Factory.setEmitX509SubjectName(true);
+//        x509Factory.setEmitEntityCertificateChain(true);
+//        x509Factory.setEmitX509IssuerSerial(true);
+//        x509Factory.setEmitX509SubjectName(true);
         Configuration.getGlobalSecurityConfiguration().getKeyInfoGeneratorManager().registerFactory("x509emitingKeyInfoGenerator", x509Factory);
 
         signature.setSigningCredential(cred);
@@ -306,6 +307,7 @@ public class SamlToolkit {
         Response r = createSamlResponse("cf31badf-b9e1-40bd-aac9-1ac8beda0283", "https://sts.windows.net/cf31badf-b9e1-40bd-aac9-1ac8beda0283/");
         toFile(r);
         verifySignature("test.saml.xml");
+        System.out.println(new DateTime());
     }
 
     private static XMLObject buildXMLObject(QName objectQName) {
