@@ -246,7 +246,7 @@ public class SamlToolkit {
         X509Data data = (X509Data) buildXMLObject(X509Data_DEFAULT_ELEMENT_NAME);
         X509Certificate cert = (X509Certificate) buildXMLObject(CERT_DEFAULT_ELEMENT_NAME);
         String value = org.apache.xml.security.utils.Base64.encode(cred.getEntityCertificate().getEncoded());
-        cert.setValue("value"); // TODO: this value is null. have to set the certificate << cred.setEntityCertificate() >>.
+        cert.setValue(value); // TODO: this value is null. have to set the certificate << cred.setEntityCertificate() >>.
         data.getX509Certificates().add(cert);
         keyInfo.getX509Datas().add(data);
         signature.setKeyInfo(keyInfo);
