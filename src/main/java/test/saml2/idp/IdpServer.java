@@ -17,15 +17,23 @@ import java.io.PrintWriter;
 class SamlRequestHandler extends AbstractHandler {
     @Override
     public void handle(String s, Request request, HttpServletRequest httpServletRequest, HttpServletResponse response) throws IOException, ServletException {
+        String samlRequest = "";
+        try {
+            samlRequest = SamlToolkit.decodeSAML_redirect(request.getParameter("SAMLRequest"), false);
+            System.out.println(samlRequest);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         response.setContentType("text/html;charset=utf-8");
         response.setStatus(HttpServletResponse.SC_OK);
         request.setHandled(true);
         PrintWriter pr = response.getWriter();
         String samlResponse = "";
+        String samlResponsePlain = "";
         try {
             Response resp = SamlToolkit.createSamlResponse("cf31badf-b9e1-40bd-aac9-1ac8beda0283", "https://localhost/cf31badf-b9e1-40bd-aac9-1ac8beda0283/");
-            samlResponse = SamlToolkit.toString(resp);
-            samlResponse = SamlToolkit.encodeSAML_post(samlResponse);
+            samlResponsePlain = SamlToolkit.toString(resp);
+            samlResponse = SamlToolkit.encodeSAML_post(samlResponsePlain);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -42,7 +50,16 @@ class SamlRequestHandler extends AbstractHandler {
                             "}\n" +
                             "</script>" +
                             "<body>" +
-                            "<form method=\"post\" action=\"/post/\">\n" +
+                            "<H1> Request received <H1>\n" +
+                            "<textarea id=\"xx\" name=\"SAMLRequest\" rows=\"4\" cols=\"50\">\n" +
+                            samlRequest +
+                            "</textarea>\n" +
+                            "<H1> Response generated (plaintext)<H1>\n" +
+                            "<textarea id=\"jj\" name=\"SAMLResponsePlain\" rows=\"20\" cols=\"100\">\n" +
+                            samlResponsePlain+
+                            "</textarea>\n" +
+                            "<form method=\"post\" action=\"https://sso-dev.pageroonline.com/authn/authentication/creative_ad_saml_authenticator/\">\n" +
+                           "<H1> Response generated (B64 enc)<H1>\n" +
                             "<textarea id=\"w3review\" name=\"SAMLResponse\" rows=\"4\" cols=\"50\">\n" +
                             samlResponse +
                             "</textarea>\n" +

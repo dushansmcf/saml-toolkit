@@ -1,18 +1,12 @@
 package test.saml2;
 
-import org.apache.commons.httpclient.auth.AuthState;
 import org.apache.commons.lang.RandomStringUtils;
-import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
-import org.bouncycastle.openssl.PEMParser;
 import org.joda.time.DateTime;
 import org.opensaml.Configuration;
 import org.opensaml.DefaultBootstrap;
 import org.opensaml.common.SAMLObjectBuilder;
-import org.opensaml.common.xml.SAMLConstants;
 import org.opensaml.saml2.core.*;
 import org.opensaml.saml2.core.impl.*;
-import org.opensaml.saml2.metadata.EntitiesDescriptor;
-import org.opensaml.xacml.ctx.impl.AttributeValueTypeImplBuilder;
 import org.opensaml.xml.XMLObject;
 import org.opensaml.xml.XMLObjectBuilder;
 import org.opensaml.xml.XMLObjectBuilderFactory;
@@ -21,22 +15,19 @@ import org.opensaml.xml.io.Unmarshaller;
 import org.opensaml.xml.io.UnmarshallerFactory;
 import org.opensaml.xml.parse.BasicParserPool;
 import org.opensaml.xml.schema.XSString;
-import org.opensaml.xml.security.SecurityConfiguration;
 import org.opensaml.xml.security.SecurityHelper;
 import org.opensaml.xml.security.credential.Credential;
-import org.opensaml.xml.security.keyinfo.*;
+import org.opensaml.xml.security.keyinfo.KeyInfoGenerator;
 import org.opensaml.xml.security.x509.BasicX509Credential;
-import org.opensaml.xml.signature.*;
-import org.opensaml.saml2.core.Assertion;
-import org.opensaml.xml.signature.Signature;
+import org.opensaml.xml.security.x509.X509KeyInfoGeneratorFactory;
+import org.opensaml.xml.signature.KeyInfo;
+import org.opensaml.xml.signature.SignatureConstants;
+import org.opensaml.xml.signature.SignatureValidator;
 import org.opensaml.xml.signature.Signer;
-import org.opensaml.saml2.core.Assertion;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
 import javax.xml.namespace.QName;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
@@ -44,13 +35,14 @@ import javax.xml.transform.stream.StreamResult;
 import java.io.*;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
-import java.security.*;
+import java.security.KeyFactory;
+import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
-import java.util.Random;
 import java.util.UUID;
-import java.util.stream.DoubleStream;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 
@@ -86,8 +78,12 @@ public class SamlToolkit {
 
     private static Credential getCredential() throws Exception {
         PrivateKey pk = KeyUtil.readPrivateKeyFromFile("src/main/resources/key.pem", "rsa");
+        CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+        X509Certificate cert = (X509Certificate)certificateFactory.generateCertificate(new FileInputStream(
+                "/home/sajith/scratch/saml-toolkit/src/main/resources/dev.localhost.crt"));
         BasicX509Credential basicCredential = new BasicX509Credential();
         basicCredential.setPrivateKey(pk);
+        basicCredential.setEntityCertificate(cert);
         return basicCredential;
 
     }
@@ -111,7 +107,7 @@ public class SamlToolkit {
         response.setIssueInstant(new DateTime());
 
         Issuer issuer = new IssuerBuilder().buildObject(ISSUER_DEFAULT_ELEMENT_NAME);
-        issuer.setValue("https://sts.windows.net/cf31badf-b9e1-40bd-aac9-1ac8beda0283/");
+        issuer.setValue(metadataUri);
         response.setIssuer(issuer);
 
         QName ASSERSION_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:assertion", "Assertion", "");
@@ -124,7 +120,7 @@ public class SamlToolkit {
 
 
         Issuer ass_issuer = new IssuerBuilder().buildObject(ISSUER_DEFAULT_ELEMENT_NAME);
-        ass_issuer.setValue("https://sts.windows.net/cf31badf-b9e1-40bd-aac9-1ac8beda0283/");
+        ass_issuer.setValue(metadataUri);
         ass.setIssuer(ass_issuer);
 
         QName STATUS_DEFAULT_ELEMENT_NAME = new QName("urn:oasis:names:tc:SAML:2.0:protocol", "Status", "samlp");
@@ -230,32 +226,32 @@ public class SamlToolkit {
 
     private static void sign(Response response, Assertion ass) throws Exception {
         QName SIGNATURE_DEFAULT_ELEMENT_NAME = new QName("http://www.w3.org/2000/09/xmldsig#", "Signature", "");
-        QName kEYINFO_DEFAULT_ELEMENT_NAME = new QName("http://www.w3.org/2000/09/xmldsig#", "KeyInfo", "");
-        QName X509Data_DEFAULT_ELEMENT_NAME = new QName("http://www.w3.org/2000/09/xmldsig#", "X509Data", "");
-        QName CERT_DEFAULT_ELEMENT_NAME = new QName("http://www.w3.org/2000/09/xmldsig#", "X509Certificate", "");
-
         Credential cred = getCredential();
+        org.opensaml.xml.signature.Signature signature = (org.opensaml.xml.signature.Signature) Configuration.getBuilderFactory().getBuilder(
+                SIGNATURE_DEFAULT_ELEMENT_NAME).buildObject(
+                org.opensaml.xml.signature.Signature.DEFAULT_ELEMENT_NAME);
 
-        Signature signature = (Signature) buildXMLObject(SIGNATURE_DEFAULT_ELEMENT_NAME);
+        X509KeyInfoGeneratorFactory x509Factory = new X509KeyInfoGeneratorFactory();
+        x509Factory.setEmitEntityCertificate(true);
+        x509Factory.setEmitEntityCertificateChain(true);
+        x509Factory.setEmitX509IssuerSerial(true);
+        x509Factory.setEmitX509SubjectName(true);
+        Configuration.getGlobalSecurityConfiguration().getKeyInfoGeneratorManager().registerFactory("x509emitingKeyInfoGenerator", x509Factory);
+
         signature.setSigningCredential(cred);
-        signature.setSignatureAlgorithm(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA256);
+        signature.setSignatureAlgorithm(SignatureConstants.ALGO_ID_SIGNATURE_RSA_SHA1);
         signature.setCanonicalizationAlgorithm(SignatureConstants.ALGO_ID_C14N_EXCL_OMIT_COMMENTS);
-        SecurityConfiguration secConfiguration = Configuration.getGlobalSecurityConfiguration();
+        KeyInfoGenerator keyInfoGenerator = x509Factory.newInstance();
 
-
-        KeyInfo keyInfo = (KeyInfo) buildXMLObject(kEYINFO_DEFAULT_ELEMENT_NAME);
-        X509Data data = (X509Data) buildXMLObject(X509Data_DEFAULT_ELEMENT_NAME);
-        X509Certificate cert = (X509Certificate) buildXMLObject(CERT_DEFAULT_ELEMENT_NAME);
-        cert.setValue("MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA+ecGIex9Bl4BjSQOBF1BVclPfSIhRQOk/ZRal8H8v1/mHJl5mb1uNGdJlrNI7gswtxBEK75uknxCVfv0NXb3i0EDCgMY1DkIYV5PlYRuDwKYgr3HbrEqwwZj08wxajtBLpy7A0toIlm3ZcWUwvC0nzCexsw32Edv6mel6P1+gm95ZhdhQnklTD7a016hkxxWUl1GNrvdcbqxR7468176MybtPcy0MvUycknM9fWj23m/L8kM2XOgopK/aU1rt7p6RWh0rY8dWDdk4J2/SQhLVSQD2dD0oqVweCrsRCVIkY4GsxQwrciUdVM5x39QN/yOn4tksaABos6j9rmYYSwnQP+o2eqxhrDQEAmsUcQXnLRPOnU1dWV2UA9kFU24fePuUI14jBiIN/l3sck8ze3pAJYsqkIsyv4yKsZIQLt48Lb3XN8b+myMSZxlUuYyOtfI3QbtLld+BO7YTGadaJG5n8AOunwhXlutrLnoi0c9bSuRBSf4a9f5GJQVjomNFO8pXVPeRXZiiCuroKQXLal1TS5efj1tMk4GkcdUyI3RC+6JsoDsU9jYqgb6Ur4UBb0dRifhigiif+LysDNA0KvVds670VG+psARm12NectJ6hbuCQ/q5ChmmTBUl6hRkqSTTm6HOYG/DAoZxjY333QPmXBPPNKiaIGIUJ4n1JMa5rMCAwEAAQ==");
-        data.getX509Certificates().add(cert);
-        keyInfo.getX509Datas().add(data);
+        KeyInfo keyInfo = null;
+        keyInfo = keyInfoGenerator.generate(cred);
         signature.setKeyInfo(keyInfo);
-        SecurityHelper.prepareSignatureParams(signature, cred, secConfiguration, "");
+        SecurityHelper.prepareSignatureParams(signature, cred, null, "");
 
         ass.setSignature(signature);
         response.getAssertions().add(ass);
         MarshallerFactory marshallerFactory = Configuration.getMarshallerFactory();
-        marshallerFactory.getMarshaller(response).marshall(response);
+        Element subjectElement = marshallerFactory.getMarshaller(response).marshall(response);
         Signer.signObject(signature);
     }
 
@@ -296,8 +292,19 @@ public class SamlToolkit {
         return result.getWriter().toString();
     }
 
+    public static void toFile(Response response) throws Exception {
+        MarshallerFactory marshallerFactory = Configuration.getMarshallerFactory();
+        Element responseElement = marshallerFactory.getMarshaller(response).marshall(response);
+        TransformerFactory transformerFactory = TransformerFactory.newInstance();
+        Transformer transformer = transformerFactory.newTransformer();
+        DOMSource source = new DOMSource(responseElement);
+        StreamResult result = new StreamResult(new FileWriter("test.saml.xml"));
+        transformer.transform(source, result);
+    }
+
     public static void main(String[] args) throws Exception {
-        createSamlResponse("cf31badf-b9e1-40bd-aac9-1ac8beda0283", "https://sts.windows.net/cf31badf-b9e1-40bd-aac9-1ac8beda0283/");
+        Response r = createSamlResponse("cf31badf-b9e1-40bd-aac9-1ac8beda0283", "https://sts.windows.net/cf31badf-b9e1-40bd-aac9-1ac8beda0283/");
+        toFile(r);
         verifySignature("test.saml.xml");
     }
 
